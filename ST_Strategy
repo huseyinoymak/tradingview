@@ -1,0 +1,69 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © huseyn_oymak
+
+//@version=5
+strategy("ST Strategy", overlay=true, calc_on_every_tick = false)
+  
+// ********** Strategy inputs - Start **********
+  
+// Used for intraday handling
+// Session value should be from market start to the time you want to square-off 
+// your intraday strategy
+// Important: The end time should be at least 2 minutes before the intraday
+// square-off time set by your broker
+var i_marketSession = input.session(title="Market session", defval="1000-1800", confirm=true)
+var float i_multiplier = input.float(title = "Multiplier", defval = 3, step = 0.1, confirm=true)
+var int i_atrPeriod = input.int(title = "ATR Period", defval = 22, confirm=true)
+var bool kapat = input.bool(defval = false, title = "APK", tooltip = "Akşam Pozisyon Kapatsın mı?")
+var bool ciftyon = input.bool(defval = false, title = "Çift Yön", tooltip = "Çift yön sistem?")
+  
+// ********** Strategy inputs - End **********
+  
+  
+// ********** Supporting functions - Start **********
+  
+// A function to check whether the bar or period is in intraday session
+barInSession(sess) => time(timeframe.period, sess) != 0
+  
+// ********** Supporting functions - End **********
+  
+  
+// ********** Strategy - Start **********
+  
+[superTrend, dir] = ta.supertrend(i_multiplier, i_atrPeriod)
+  
+colResistance = dir == 1 and dir == dir[1] ? color.new(color.red, 0) : color.new(color.red, 100)
+colSupport = dir == -1 and dir == dir[1] ? color.new(color.green, 0) : color.new(color.green, 100)
+  
+plot(superTrend, color = colResistance, linewidth=2)
+plot(superTrend, color = colSupport, linewidth=2)
+  
+// Long/short condition
+longCondition = dir == -1 and dir[1] == 1
+shortCondition = dir == 1 and dir[1] == -1
+  
+// See if intraday session is active
+bool intradaySession = barInSession(i_marketSession)
+  
+// Trade only if intraday session is active
+   
+// Long position
+// When longCondition and intradaySession both are true
+if (longCondition and intradaySession)
+    strategy.entry(id = "AL", direction = strategy.long)
+
+if (ciftyon == false and shortCondition)
+    strategy.close_all(comment = "FLAT")
+
+
+// Short position
+// When shortCondition and intradaySession both are true
+if (ciftyon and shortCondition and intradaySession)
+    strategy.entry(id = "SAT", direction = strategy.short)
+   
+// Square-off position (when session is over and position is open)
+squareOff = (not intradaySession) and (strategy.position_size != 0)
+if (kapat and squareOff)
+    strategy.close_all(comment = "POZ KAPAT")
+  
+// ********** Strategy - End **********
