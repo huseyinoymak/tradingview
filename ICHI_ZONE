@@ -1,0 +1,29 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © huseyn_oymak
+
+//@version=5
+indicator("ICHI ZONE", overlay = true)
+len = input.int(defval = 480)
+len_2 = len/2
+len_3 = len_2*25/10
+
+ICH4 = len_3/2
+ICH5 = len_2/2
+ICH6 = len/3
+
+TK = (ta.highest(high,len_3) + ta.lowest(low,len_3))/2
+KJ = (ta.highest(high,len_2) + ta.lowest(low,len_2))/2
+
+SA = (TK+KJ)/2 
+SB = (ta.highest(high,len) + ta.lowest(low,len))/2
+
+TK_2 = (ta.highest(high,ICH4) + ta.lowest(low,ICH4))/2
+KJ_2 = (ta.highest(high,ICH5) + ta.lowest(low,ICH5))/2
+
+SA_2 = (TK_2+KJ_2)/2 
+SB_2 = (ta.highest(high,ICH6) + ta.lowest(low,ICH6))/2
+
+ZONEY = SA > SB * 1.004 and TK > KJ ? close : 0
+ZONEX = TK_2 > SA * 1.004 and ZONEY == 0 ? close : 0
+plot(ZONEX, color = color.new(color.green, 50), style=plot.style_area)
+plot(ZONEY, color = color.new(color.yellow, 50), style=plot.style_area)
