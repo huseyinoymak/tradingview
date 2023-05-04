@@ -1,0 +1,20 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © huseyn_oymak
+
+//@version=5
+indicator("YSUN", "YSUN", overlay=true)
+
+YGT = input.float(defval = 0.8, minval = 0.001, maxval = 20, title="MS1")
+BU = input.float(defval = 0.2, minval = 0.001, maxval = 20, title="MS2")
+KYN = ta.ema(hlc3,3)
+
+muck(source,len) =>
+    mck = 0.0
+    mck := source * (1-len/100) > nz(mck[1],0) ? source * (1-len/100) : source * (1+len/100) < nz(mck[1],0) ? source * (1+len/100) : mck[1]
+    mck
+
+x1 = (muck(KYN,YGT)/0.025+0.50)*0.025
+x2 = (muck(KYN,BU)/0.025+0.50)*0.025
+
+plot(x1, linewidth=2, color=color.maroon)
+plot(x2, linewidth=2, color=color.fuchsia)
