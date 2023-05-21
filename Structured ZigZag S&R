@@ -1,0 +1,233 @@
+//@version=5
+indicator('Structured ZigZag Support&Resistance', shorttitle='Structured ZigZag S/R', overlay=true, max_bars_back=500, max_lines_count = 500, max_boxes_count = 500, max_labels_count = 500)
+
+var HIGH = 1, LOW = -1
+var BOXES = 'boxes', LINES = 'lines'
+
+i_horizontalType            = input.string(LINES, 'Horizontal type', options=[LINES, BOXES], group='current S/R setting')   
+i_firstDepth                = input.int(34, 'Depth', group='current S/R setting')
+i_firstDeviation            = input.float(6.0, 'Deviation', group='current S/R setting')
+i_firstColor                = input.color(color.blue, 'Color', group='current S/R setting')
+i_extendLines               = input.bool(true, 'Extend lines', group='current S/R setting')
+i_lineCount                 = input.int(6, 'Line count', group='current S/R setting')
+i_boxHighColor              = input.color(color.green, 'Diagonal high color', group='diagonal line setting', inline='15')
+i_boxLowColor               = input.color(color.red, 'Diagonal low color', group='diagonal line setting', inline='15')
+
+i_diagonalThickness         = input.int(1, 'Line thickness', minval=1, group='diagonal line setting', inline='12')
+i_diagonalLineStyle         = input.string(line.style_dashed, 'Line style', options=[line.style_dotted, line.style_solid, line.style_dashed], group='diagonal line setting', inline='12')
+i_diagonalColor             = input.color(color.gray, 'Diagonal color', group='diagonal line setting', inline='13')
+i_zigzagCount               = input.int(200, 'Zigzag count', group='diagonal line setting', inline='14')
+i_diagonalHighColor         = input.color(color.green, 'Diagonal high color', group='diagonal line setting', inline='15')
+i_diagonalLowColor          = input.color(color.red, 'Diagonal low color', group='diagonal line setting', inline='15')
+i_diagonalSRLineCount       = input.int(2, 'Diagonal S/R line count', group='diagonal line setting', inline='16')
+i_showDiagonalSRLines       = input.bool(true, 'Show diagonal S/R lines', group='diagonal line setting', inline='16')
+
+var zigZagArray = array.new_line()
+var zigZagBoxArray = array.new_box()
+var zigZagLabelArray = array.new_label()
+var diagonalArray = array.new_line()
+var diagonalSRArray = array.new_line()
+var diagonalLabelArray = array.new_label()
+
+var valueArray = array.new_float()
+var typeArray = array.new_int()
+var indexArray = array.new_int()
+
+f_isUpCandle(_index) =>
+    open[_index] <= close[_index]
+    
+f_drawDiagonalLine(_x1, _x2, _y1, _y2, _lineColor, _lineThickness, _lineStyle, _extend) =>
+    line.new(x1=_x1, y1=_y1, x2=_x2, y2=_y2, color=_lineColor, style=_lineStyle, width=_lineThickness, extend=_extend) 
+    
+f_drawDiagonalLabel(_xValue, _yValue, _text, _labelColor, _down) =>
+    adjustedYPosition = _down ? _yValue * 1.005: _yValue * 0.995
+    dlb = label.new(_xValue, adjustedYPosition , _text, xloc.bar_index, yloc.price, #00000000, label.style_none, _labelColor)
+    if array.size(diagonalLabelArray) == i_zigzagCount
+        label.delete(array.shift(diagonalLabelArray))
+    array.push(diagonalLabelArray, dlb)
+    
+f_createDiagonalLabelText(_yValue) =>
+    index = array.size(valueArray) - 3
+    if (index >= 0)
+        previousType = array.get(typeArray, index)
+        previousValue =  array.get(valueArray, index)
+        previousType == HIGH ?
+          previousValue <= _yValue ? 'HH': "LH" :
+          previousValue <= _yValue ? 'HL': "LL"
+    else
+        ''
+
+f_drawDiagonalLines(_x1, _x2, _y1, _y2, _lineColor, _lineThickness, _lineStyle, _lineCount, _lineArray, _extend) =>
+    line l = f_drawDiagonalLine(_x1, _x2, _y1, _y2, _lineColor, _lineThickness, _lineStyle, _extend)
+
+    if array.size(_lineArray) == _lineCount
+        line.delete(array.shift(_lineArray))
+    array.push(_lineArray, l)
+    
+f_addValuesToArrays(_barIndex, _yValue, _type) =>
+    if array.size(valueArray) == i_zigzagCount
+        array.shift(valueArray)
+        array.shift(indexArray)
+        array.shift(typeArray)
+        
+    array.push(valueArray, _yValue)
+    array.push(indexArray, _barIndex)
+    array.push(typeArray, _type)
+    
+
+f_getLastZigzag() =>
+    int size = array.size(valueArray) - 1
+    x1 = array.get(indexArray, size)
+    y1 = array.get(valueArray, size)
+    type = array.get(typeArray, size)
+    [x1, y1, type]
+    
+
+
+f_addDiagonalLine(_x2, _y2) =>
+    hasAtleastOnerecord = array.size(valueArray) >= 1
+    if (hasAtleastOnerecord)
+        [x1, y1, type] = f_getLastZigzag()
+        f_drawDiagonalLines(x1, _x2, y1, _y2, i_diagonalColor, i_diagonalThickness, i_diagonalLineStyle, i_zigzagCount, diagonalArray, extend.none)
+        
+f_drawDiagonalSRLine(_xValue, _yValue) =>
+    index = array.size(valueArray) - 2
+    if (i_showDiagonalSRLines and index >= 0)
+        previousType = array.get(typeArray, index)
+        previousValue =  array.get(valueArray, index)
+        previousXValue =  array.get(indexArray, index)
+        diagonalSRColor =previousType == HIGH ? i_diagonalHighColor: i_diagonalLowColor
+        f_drawDiagonalLines(previousXValue, _xValue, previousValue, _yValue, diagonalSRColor, i_diagonalThickness, i_diagonalLineStyle, i_diagonalSRLineCount, diagonalSRArray, extend.right)
+
+
+f_zigzag(_depth, _deviation) =>
+    var lw = 1
+    var hg = 1
+    lw := lw + 1
+    hg := hg + 1
+    lowestValue = -ta.lowestbars(_depth)
+    highestValue = -ta.highestbars(_depth)
+    lowing = lw == lowestValue or low - low[lowestValue] > _deviation * syminfo.mintick
+    highing = hg == highestValue or high[highestValue] - high > _deviation * syminfo.mintick
+    lh = ta.barssince(not highing)
+    ll = ta.barssince(not lowing)
+    down = lh > ll
+    lower = low[lw] > low[lowestValue]
+    higher = high[hg] < high[highestValue]
+    if lw != lowestValue and (not down[1] or lower)
+        lw := lowestValue < hg ? lowestValue : 0
+        lw
+    if hg != highestValue and (down[1] or higher)
+        hg := highestValue < lw ? highestValue : 0
+        hg
+    x1 = down ? lw : hg
+    y1 = down ? low[lw] : high[hg]
+    lb = down ? label.style_label_up : label.style_label_down
+    [down != down[1], x1, y1, lw, hg, down]
+
+
+f_drawLine(_x1, _x2, _yValue, _lineColor) =>
+    line.new(x1=_x1, y1=_yValue, x2=_x2, y2=_yValue, color=_lineColor, style=line.style_dotted, width=2)
+    
+f_drawBox(_x1, _x2, _high, _low, _boxColor) =>
+     box.new(_x1, _high, _x2, _low, bgcolor=_boxColor, border_style=line.style_dashed, border_color=_boxColor)
+
+f_drawLabelCurrent(_x, _y, _textColor) =>
+    label.new(_x, _y, '         ' + str.tostring(_y), xloc.bar_index, yloc.price, #00000000, label.style_none, _textColor)
+
+f_drawLabel(_yValue, _xValue, _labelColor, _text, _showLabels) =>
+    var label lb = na
+    label.delete(lb)
+
+    if _showLabels and not na(_yValue)
+        lb := label.new(x=_xValue, y=_yValue, text=_text, textcolor=_labelColor, style=label.style_none, xloc=xloc.bar_time, yloc=yloc.price)
+        lb
+    lb
+
+f_extendArray(_lineArray, _labelArray, _extendLines) =>
+    if array.size(_lineArray) > 0
+        for _i = array.size(_lineArray) - 1 to 0 by 1
+
+            x2 = line.get_x2(array.get(_lineArray, _i))
+            yValue = line.get_y1(array.get(_lineArray, _i))
+
+            if _extendLines or bar_index - 1 == x2 and not(high > yValue and low < yValue)
+                line.set_x2(array.get(_lineArray, _i), bar_index)
+                label.set_x(array.get(_labelArray, _i), bar_index)
+                
+f_extendBoxArray(_boxArray, _labelArray) =>
+    if array.size(_boxArray) > 0
+        for _i = array.size(_boxArray) - 1 to 0 by 1
+            boxId = array.get(_boxArray, _i)
+            box.set_right(boxId, bar_index)
+            label.set_x(array.get(_labelArray, _i), bar_index)
+
+
+f_addLines(_switch, _x1, _y1, _lw, _hg, _down, _colorLine) =>
+    if _switch
+        line l = na
+        label lab = na
+
+        nx = _down ? _hg : _lw
+        yValue = _down ? high[nx] : low[nx]
+        x1 = bar_index - nx
+        x2 = bar_index
+
+        if _down != _down[1] and not na(yValue)
+            f_addDiagonalLine(x1, yValue)
+            f_drawDiagonalSRLine(x1, yValue)
+            int type = _down ? HIGH : LOW
+            f_addValuesToArrays(x1, yValue, type)
+            l := f_drawLine(x1, x2, yValue, _colorLine)
+            lab := f_drawLabelCurrent(x2, yValue, _colorLine)
+        
+            
+        if array.size(zigZagArray) == i_lineCount
+            line.delete(array.shift(zigZagArray))
+            label.delete(array.shift(zigZagLabelArray))
+        diagonalLabelColor = _down ? i_diagonalHighColor: i_diagonalLowColor
+        f_drawDiagonalLabel(x1, yValue, f_createDiagonalLabelText(yValue), diagonalLabelColor, _down)
+        array.push(zigZagArray, l)
+        array.push(zigZagLabelArray, lab)
+        
+f_addBoxes(_switch, _x1, _y1, _lw, _hg, _down) =>
+    if _switch
+        box b = na
+        label lab = na
+
+        nx = _down ? _hg : _lw
+        yValue = _down ? high[nx] : low[nx]
+        x1 = bar_index - nx
+        x2 = bar_index
+        yValueHigh = _down? high[nx]: f_isUpCandle(nx)? open[nx] : close[nx]
+        yValueLow =  not _down? low[nx]: f_isUpCandle(nx)? close[nx] : open[nx]
+        
+        boxColor = color.new(_down ? i_boxHighColor: i_boxLowColor, 70)
+
+        if _down != _down[1] and not na(yValue)
+            f_addDiagonalLine(x1, yValue)
+            f_drawDiagonalSRLine(x1, yValue)
+            int type = _down ? HIGH : LOW
+            f_addValuesToArrays(x1, yValue, type)
+            b := f_drawBox(x1, x2, yValueHigh, yValueLow, boxColor)
+            lab := f_drawLabelCurrent(x2, yValue, boxColor)
+        
+            
+        if array.size(zigZagBoxArray) == i_lineCount
+            box.delete(array.shift(zigZagBoxArray))
+            label.delete(array.shift(zigZagLabelArray))
+        diagonalLabelColor = _down ? i_diagonalHighColor: i_diagonalLowColor
+        f_drawDiagonalLabel(x1, yValue, f_createDiagonalLabelText(yValue), diagonalLabelColor, _down)
+        array.push(zigZagBoxArray, b)
+        array.push(zigZagLabelArray, lab)
+
+
+// current functions           
+[switch1, x11, y11, lw1, hg1, down1] = f_zigzag(i_firstDepth, i_firstDeviation)
+
+if (i_horizontalType == LINES)
+    f_addLines(switch1, x11, y11, lw1, hg1, down1, i_firstColor)
+    f_extendArray(zigZagArray, zigZagLabelArray, i_extendLines)
+else
+    f_addBoxes(switch1, x11, y11, lw1, hg1, down1)
+    f_extendBoxArray(zigZagBoxArray, zigZagLabelArray)
