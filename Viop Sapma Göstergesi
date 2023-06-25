@@ -1,0 +1,22 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © huseyinoymak
+
+//@version=5
+indicator("Viop Sapma Göstergesi")
+
+//Inputs
+l = input.int(104, minval = 10, title = "Gösterge Periyodu")
+pd = close-ta.ema(close,l)
+hpd = ta.highest(pd,l*2)
+lpd = ta.lowest(pd,l*2)
+nf = 200 / ( hpd - lpd )
+sapma = ((pd-lpd)*nf)-100
+
+//Plots
+plot(sapma, color = color.yellow, style = plot.style_line, linewidth = 3)
+plot(100, color = color.gray, style = plot.style_circles)
+plot(87, color = color.gray, style = plot.style_circles)
+plot(18, color = color.gray, style = plot.style_circles)
+plot(0, color = color.gray, style = plot.style_circles)
+plot(-87, color = color.gray, style = plot.style_circles)
+plot(-100, color = color.gray, style = plot.style_circles)
