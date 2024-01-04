@@ -1,0 +1,945 @@
+//@version=5
+
+indicator(title='Maestro - Pivot Master', shorttitle='Maestro - Pivot Master', overlay=true)
+
+
+
+text_R6 = 'Yukarı Hedef 2'
+
+text_R5 = 'Yukarı Hedef 1'
+
+text_R1 = 'R1'
+
+text_R2 = 'R2'
+
+text_R4 = 'Düşüşün Sonu'
+
+text_R35 = 'Düşüş Ters Dönüş Yüksek'
+
+text_R3 = 'Düşüş Ters Dönüş Düşük'
+
+text_R3R35 = 'Düşüş Ters Dönüş Bölgesi'
+
+text_S1 = 'S1'
+
+text_S2 = 'S2'
+
+text_S6 = 'Aşağı Hedef 2'
+
+text_S5 = 'Aşağı Hedef 1'
+
+text_S4 = 'Yükselişin Sonu'
+
+text_S35 = 'Yükseliş Ters Dönüş Düşük'
+
+text_S3 = 'Yükseliş Ters Dönüş Yüksek'
+
+text_S3S35 = 'Yükseliş Ters Dönüş Bölgesi'
+
+text_TC = 'TC'
+
+text_BC = 'BC'
+
+text_CP = 'CP'
+
+text_PP_Close = 'Kapanış'
+
+text_PP_High = 'Yüksek'
+
+text_PP_Low = 'Düşük'
+
+
+
+t_d = 'D'
+
+t_w = 'W'
+
+t_m = 'M'
+
+t_q = '3M'
+
+t_y = '12M'
+
+t_d_lt = '1440'
+
+
+
+tooltip_last_traded = 'Günlük pivotlar için sadece vadeli işlem piyasalarında yerine yerleşim fiyatını kullanın.'
+
+
+
+draw_line(_x1, _y1, _x2, _y2, _xloc, _extend, _color, _style, _width) =>
+
+    dline = line.new(x1=_x1, y1=_y1, x2=_x2, y2=_y2, xloc=_xloc, extend=_extend, color=_color, style=_style, width=_width)
+
+    line.delete(dline[1])
+
+
+
+draw_box(_left, _top, _right, _bottom, _color, _width, _style, _extend, _xloc, _bgcolor) =>
+
+    dbox = box.new(left=_left, top=_top, right=_right, bottom=_bottom, border_color=_color, border_width=_width, border_style=_style, extend=_extend, xloc=_xloc, bgcolor=_bgcolor)
+
+    box.delete(dbox[1])
+
+
+
+draw_label(_x, _y, _text, _xloc, _yloc, _color, _style, _textcolor, _size, _textalign, _tooltip) =>
+
+    dlabel = label.new(x=_x, y=_y, text=_text, xloc=_xloc, yloc=_yloc, color=_color, style=_style, textcolor=_textcolor, size=_size, textalign=_textalign, tooltip=_tooltip)
+
+    label.delete(dlabel[1])
+
+
+
+tickerid_func() =>
+
+    tickerid = syminfo.prefix + ':' + syminfo.tickerid
+
+    if syminfo.type == 'futures'
+
+        tickerid := syminfo.prefix + ':' + syminfo.root + '1!'
+
+
+
+transp_func() =>
+
+    transp_0 = 0
+
+
+
+t_func(t, use_last_traded) =>
+
+    t_temp = t
+
+    if use_last_traded
+
+        if t == t_d
+
+            t_temp := t_d_lt
+
+    t_temp
+
+
+
+
+
+var labels_enabled = input.bool(defval=true, title='Etiketleri Göster')
+
+var t = input.string(title='Pivotlar için Zaman Dilimi', defval=t_m, options=[t_d, t_w, t_m, t_q, t_y])
+
+var use_last_traded = input.bool(defval=false, title='Kapanış İçin Son İşlem Fiyatını Kullan', tooltip=tooltip_last_traded)
+
+var plot_history = input.bool(defval=true, title='Geçmiş Pivotlar', group='Çizim Derinliği')
+
+var next_period = input.bool(defval=false, title='Sonraki Dönem Pivotları', group='Çizim Derinliği')
+
+var lower_cams = input.bool(defval=false, title='Daha Düşük Sıralı Camarilla Seviyeleri', group='Ek Seviyeler')
+
+var CPR = input.bool(defval=false, title='Merkezi Pivot Aralığı', group='Ek Seviyeler')
+
+var pp_hlc = input.bool(defval=false, title='Posty Pivotlar H/L/C', group='Ek Seviyeler')
+
+
+
+var color_R6 = input.color(defval=color.new(color.green,0), title=text_R6, group='Colors')
+
+var color_R5 = input.color(defval=color.new(color.green,0), title=text_R5, group='Colors')
+
+var color_R4 = input.color(defval=color.new(color.green,0), title=text_R4, group='Colors')
+
+var color_R35 = input.color(defval=color.new(color.red,80), title=text_R3R35, group='Colors')
+
+var color_R2 = input.color(defval=color.new(color.olive,0), title=text_R2, group='Colors')
+
+var color_R1 = input.color(defval=color.new(color.orange,0), title=text_R1, group='Colors')
+
+
+
+var color_S6 = input.color(defval=color.new(color.red,0), title=text_S6, group='Colors')
+
+var color_S5 = input.color(defval=color.new(color.red,0), title=text_S5, group='Colors')
+
+var color_S4 = input.color(defval=color.new(color.red,0), title=text_S4, group='Colors')
+
+var color_S35 = input.color(defval=color.new(color.green,80), title=text_S3S35, group='Colors')
+
+var color_S2 = input.color(defval=color.new(color.olive,0), title=text_S2, group='Colors')
+
+var color_S1 = input.color(defval=color.new(color.orange,0), title=text_S1, group='Colors')
+
+
+
+var color_CP = input.color(defval=color.new(color.purple,95), title='Central Pivot Range', group='Colors')
+
+var color_close = input.color(defval=color.new(#00C0FF,0), title=text_PP_Close, group='Colors')
+
+var color_high = input.color(defval=color.new(#00C0FF,0), title=text_PP_High, group='Colors')
+
+var color_low = input.color(defval=color.new(#00C0FF,0), title=text_PP_Low, group='Colors')
+
+
+
+
+
+shigh = request.security(tickerid_func(), t_func(t, use_last_traded), high[1], barmerge.gaps_off, barmerge.lookahead_on)
+
+slow = request.security(tickerid_func(), t_func(t, use_last_traded), low[1], barmerge.gaps_off, barmerge.lookahead_on)
+
+sclose = request.security(tickerid_func(), t_func(t, use_last_traded), close[1], barmerge.gaps_off, barmerge.lookahead_on)
+
+start_time = request.security(tickerid_func(), t_func(t, use_last_traded), time_close[1], barmerge.gaps_off, barmerge.lookahead_on)
+
+r = shigh - slow
+
+
+
+n_shigh = request.security(tickerid_func(), t_func(t, use_last_traded), high[0], barmerge.gaps_off, barmerge.lookahead_on)
+
+n_slow = request.security(tickerid_func(), t_func(t, use_last_traded), low[0], barmerge.gaps_off, barmerge.lookahead_on)
+
+n_sclose = request.security(tickerid_func(), t_func(t, use_last_traded), close[0], barmerge.gaps_off, barmerge.lookahead_on)
+
+n_r = n_shigh - n_slow
+
+
+
+n_last_close = request.security(tickerid_func(), t_func(t, use_last_traded), time_close[1], barmerge.gaps_off, barmerge.lookahead_on)
+
+n_last_open = request.security(tickerid_func(), t_func(t, use_last_traded), time_close[2], barmerge.gaps_off, barmerge.lookahead_on)
+
+n_duration = n_last_close - n_last_open
+
+n_next_open = n_last_close + n_duration
+
+n_next_close = n_next_open + 3 * 86400000
+
+
+
+R6 = shigh / slow * sclose //Bull target 2
+
+R4 = sclose + r * (1.1 / 2) //Bear Last Stand
+
+R3 = sclose + r * (1.1 / 4) //Bear Reversal Low
+
+R5 = R4 + 1.168 * (R4 - R3) //Bull Target 1
+
+R35 = R4 - (R4 - R3) / 2 //Bear Reversal High
+
+R2 = sclose + r * (1.1 / 6)
+
+R1 = sclose + r * (1.1 / 12)
+
+S1 = sclose - r * (1.1 / 12)
+
+S2 = sclose - r * (1.1 / 6)
+
+S3 = sclose - r * (1.1 / 4) //Bull Reversal High
+
+S4 = sclose - r * (1.1 / 2) //Bull Last Stand
+
+S6 = sclose - (R6 - sclose) //Bear Target 2
+
+S35 = S3 - (S3 - S4) / 2 //Bull Reversal Low
+
+S5 = S4 - 1.168 * (S3 - S4) //Bear Target 1
+
+//Calculate CPR
+
+CP = (shigh + slow + sclose) / 3
+
+BC = (shigh + slow) / 2
+
+TC = CP - BC + CP
+
+
+
+//Calculate next period pivots
+
+n_R6 = n_shigh / n_slow * n_sclose //Bull target 2
+
+n_R4 = n_sclose + n_r * (1.1 / 2) //Bear Last Stand
+
+n_R3 = n_sclose + n_r * (1.1 / 4) //Bear Reversal Low
+
+n_R5 = n_R4 + 1.168 * (n_R4 - n_R3) //Bull Target 1
+
+n_R35 = n_R4 - (n_R4 - n_R3) / 2 //Bear Reversal High
+
+n_R2 = n_sclose + n_r * (1.1 / 6)
+
+n_R1 = n_sclose + n_r * (1.1 / 12)
+
+n_S1 = n_sclose - n_r * (1.1 / 12)
+
+n_S2 = n_sclose - n_r * (1.1 / 6)
+
+n_S3 = n_sclose - n_r * (1.1 / 4) //Bull Reversal High
+
+n_S4 = n_sclose - n_r * (1.1 / 2) //Bull Last Stand
+
+n_S6 = n_sclose - (n_R6 - n_sclose) //Bear Target 2
+
+n_S35 = n_S3 - (n_S3 - n_S4) / 2 //Bull Reversal Low
+
+n_S5 = n_S4 - 1.168 * (n_S3 - n_S4) //Bear Target 1
+
+//Calculate next period CPR
+
+n_CP = (n_shigh + n_slow + n_sclose) / 3
+
+n_BC = (n_shigh + n_slow) / 2
+
+n_TC = n_CP - n_BC + n_CP
+
+
+
+float _R1 = na
+
+float _R2 = na
+
+float _R6 = na
+
+float _R5 = na
+
+float _R4 = na
+
+float _R35 = na
+
+float _R3 = na
+
+float _S3 = na
+
+float _S35 = na
+
+float _S4 = na
+
+float _S5 = na
+
+float _S6 = na
+
+float _S1 = na
+
+float _S2 = na
+
+float _TC = na
+
+float _CP = na
+
+float _BC = na
+
+float _PP_H = na
+
+float _PP_L = na
+
+float _PP_C = na
+
+
+
+
+
+var show_chart = false
+
+
+
+if timeframe.isintraday
+
+    show_chart := true
+
+else if timeframe.isdaily
+
+    show_chart := switch t
+
+        t_w => true
+
+        t_m => true
+
+        t_q => true
+
+        t_y => true
+
+else if timeframe.isweekly
+
+    show_chart := switch t
+
+        t_m => true
+
+        t_q => true
+
+        t_y => true
+
+else if timeframe.ismonthly
+
+    if timeframe.period == t_m
+
+        show_chart := switch t
+
+            t_q => true
+
+            t_y => true
+
+    else if timeframe.period == t_q and t == t_y
+
+        show_chart := true
+
+
+
+if show_chart == false
+
+    runtime.error("Bu grafik için Pivot zaman dilimi çok düşük. Lütfen grafik çözünürlüğünü düşürün veya pivotlar için daha yüksek bir zaman dilimi seçin.")
+
+
+
+//Plot all days
+
+if show_chart and plot_history
+
+    _R6 := R6
+
+    _R5 := R5
+
+    _R4 := R4
+
+    _R35 := R35
+
+    _R3 := R3
+
+    _S3 := S3
+
+    _S35 := S35
+
+    _S4 := S4
+
+    _S5 := S5
+
+    _S6 := S6
+
+
+
+if show_chart and plot_history and lower_cams
+
+    _S1 := S1
+
+    _S2 := S2
+
+    _R1 := R1
+
+    _R2 := R2
+
+
+
+if show_chart and plot_history and CPR
+
+    _TC := TC
+
+    _CP := CP
+
+    _BC := BC
+
+
+
+if show_chart and plot_history and pp_hlc
+
+    _PP_C := sclose
+
+    _PP_H := shigh
+
+    _PP_L := slow
+
+
+
+//Bull (R levels)
+
+plot(_R6, title=text_R6, color=color_R6, linewidth=1) //Bull target 2
+
+plot(_R5, title=text_R5, color=color_R5, linewidth=1) //Bull Target 1
+
+plot(_R4, title=text_R4, color=color_R4, linewidth=2) //Bear Last Stand
+
+plot_R35 = plot(_R35, title=text_R35, color=color.new(color_R35,transp_func()), linewidth=1)
+
+plot_R3 = plot(_R3, title=text_R3, color=color.new(color_R35,transp_func()), linewidth=1)
+
+fill(plot_R35, plot_R3, color_R35, title=text_R3R35) //Bear Reversal Zone
+
+plot(_R1, title=text_R1, color=color_R1, linewidth=1) //R1
+
+plot(_R2, title=text_R2, color=color_R2, linewidth=1) //R2
+
+
+
+//Bear (S levels)
+
+plot_S3 = plot(_S3, title=text_S3, color=color.new(color_S35,transp_func()), linewidth=1)
+
+plot_S35 = plot(_S35, title=text_S35, color=color.new(color_S35,transp_func()), linewidth=1)
+
+fill(plot_S3, plot_S35, color_S35, title=text_S3S35) //Bull Reversal Zone
+
+plot(_S4, title=text_S4, color=color_S4, linewidth=2) //Bull Last Stand
+
+plot(_S5, title=text_S5, color=color_S5, linewidth=1) //Bear Target 1
+
+plot(_S6, title=text_S6, color=color_S6, linewidth=1) //Bear Target 2
+
+plot(_S1, title=text_S1, color=color_S1, linewidth=1) //S1
+
+plot(_S2, title=text_S2, color=color_S2, linewidth=1) //S2
+
+
+
+//CPR
+
+plot(_CP, title=text_CP, color=color.new(color_CP,transp_func()), linewidth=2)
+
+plotBC = plot(_BC, title=text_BC, color=color.new(color_CP,transp_func()), linewidth=1)
+
+plotTC = plot(_TC, title=text_TC, color=color.new(color_CP,transp_func()), linewidth=1)
+
+fill(plotBC, plotTC, color_CP, title='CPR')
+
+
+
+//PP HLC
+
+plot(_PP_C, title=text_PP_Close, color=color_close, linewidth=1)
+
+plot(_PP_H, title=text_PP_High, color=color_high, linewidth=1)
+
+plot(_PP_L, title=text_PP_Low, color=color_low, linewidth=1)
+
+
+
+////Plot today only
+
+if show_chart and not plot_history
+
+    draw_line(start_time, R6, time, R6, xloc.bar_time, extend.none, color_R6, line.style_solid, 1) //Bull target 2
+
+    draw_line(start_time, R5, time, R5, xloc.bar_time, extend.none, color_R5, line.style_solid, 1) //Bull Target 1
+
+    draw_line(start_time, R4, time, R4, xloc.bar_time, extend.none, color_R4, line.style_solid, 2) //Bear Last Stand
+
+    draw_line(start_time, R3, time, R3, xloc.bar_time, extend.none, color.new(color_R35,transp_func()), line.style_solid, 1) //Bear Reversal Low
+
+    draw_line(start_time, R35, time, R35, xloc.bar_time, extend.none, color.new(color_R35,transp_func()), line.style_solid, 1) //Bear Reversal High
+
+    draw_box(start_time, R35, time, R3, color.new(color_R35,100), 1, line.style_solid, extend.none, xloc.bar_time, color_R35) //Bear Reversal Zone
+
+    draw_line(start_time, S3, time, S3, xloc.bar_time, extend.none, color.new(color_S35,transp_func()), line.style_solid, 1) //Bull Reversal Low
+
+    draw_line(start_time, S35, time, S35, xloc.bar_time, extend.none, color.new(color_S35,transp_func()), line.style_solid, 1) //Bull Reversal High
+
+    draw_box(start_time, S3, time, S35, color.new(color_S35,100), 1, line.style_solid, extend.none, xloc.bar_time, color_S35) //Bull Reversal Zone
+
+    draw_line(start_time, S4, time, S4, xloc.bar_time, extend.none, color_S4, line.style_solid, 2) //Bull Last Stand
+
+    draw_line(start_time, S5, time, S5, xloc.bar_time, extend.none, color_S5, line.style_solid, 1) //Bear Target 1
+
+    draw_line(start_time, S6, time, S6, xloc.bar_time, extend.none, color_S6, line.style_solid, 1) //Bear Target 2
+
+
+
+if show_chart and not plot_history and lower_cams //Lower order Canmarillas
+
+    draw_line(start_time, R1, time, R1, xloc.bar_time, extend.none, color_R1, line.style_solid, 1) //R1
+
+    draw_line(start_time, R2, time, R2, xloc.bar_time, extend.none, color_R2, line.style_solid, 1) //R2
+
+    draw_line(start_time, S1, time, S1, xloc.bar_time, extend.none, color_S1, line.style_solid, 1) //R1
+
+    draw_line(start_time, S2, time, S2, xloc.bar_time, extend.none, color_S2, line.style_solid, 1) //R2
+
+
+
+if show_chart and not plot_history and CPR //CPR
+
+    draw_box(start_time, BC, time, TC, color.new(color_CP,100), 1, line.style_solid, extend.none, xloc.bar_time, color_CP) //Central Pivot Range
+
+    draw_line(start_time, CP, time, CP, xloc.bar_time, extend.none, color.new(color_CP,transp_func()), line.style_solid, 2) //Central Pivot
+
+    draw_line(start_time, BC, time, BC, xloc.bar_time, extend.none, color.new(color_CP,transp_func()), line.style_solid, 1) //Bottom Channel
+
+    draw_line(start_time, TC, time, TC, xloc.bar_time, extend.none, color.new(color_CP,transp_func()), line.style_solid, 1) //Top Channel
+
+
+
+if show_chart and not plot_history and pp_hlc //PP High Low Close
+
+    draw_line(start_time, sclose, time, sclose, xloc.bar_time, extend.none, color_close, line.style_solid, 1) //PP Close
+
+    draw_line(start_time, shigh, time, shigh, xloc.bar_time, extend.none, color_high, line.style_solid, 1) //PP High
+
+    draw_line(start_time, slow, time, slow, xloc.bar_time, extend.none, color_low, line.style_solid, 1) //PP Low
+
+
+
+////Plot next period
+
+if show_chart and next_period
+
+    draw_line(n_next_open, n_R6, n_next_close, n_R6, xloc.bar_time, extend.none, color_R6, line.style_solid, 1) //Bull target 2
+
+    draw_line(n_next_open, n_R5, n_next_close, n_R5, xloc.bar_time, extend.none, color_R5, line.style_solid, 1) //Bull Target 1
+
+    draw_line(n_next_open, n_R4, n_next_close, n_R4, xloc.bar_time, extend.none, color_R4, line.style_solid, 2) //Bear Last Stand
+
+    draw_line(n_next_open, n_R3, n_next_close, n_R3, xloc.bar_time, extend.none, color.new(color_R35,transp_func()), line.style_solid, 1) //Bear Reversal Low
+
+    draw_line(n_next_open, n_R35, n_next_close, n_R35, xloc.bar_time, extend.none, color.new(color_R35,transp_func()), line.style_solid, 1) //Bear Reversal High
+
+    draw_box(n_next_open, n_R35, n_next_close, n_R3, color.new(color_R35,100), 1, line.style_solid, extend.none, xloc.bar_time, color_R35) //Bear Reversal Zone
+
+    draw_line(n_next_open, n_S3, n_next_close, n_S3, xloc.bar_time, extend.none, color.new(color_S35,transp_func()), line.style_solid, 1) //Bull Reversal Low
+
+    draw_line(n_next_open, n_S35, n_next_close, n_S35, xloc.bar_time, extend.none, color.new(color_S35,transp_func()), line.style_solid, 1) //Bull Reversal High
+
+    draw_box(n_next_open, n_S3, n_next_close, n_S35, color.new(color_S35,100), 1, line.style_solid, extend.none, xloc.bar_time, color_S35) //Bull Reversal Zone
+
+    draw_line(n_next_open, n_S4, n_next_close, n_S4, xloc.bar_time, extend.none, color_S4, line.style_solid, 2) //Bull Last Stand
+
+    draw_line(n_next_open, n_S5, n_next_close, n_S5, xloc.bar_time, extend.none, color_S5, line.style_solid, 1) //Bear Target 1
+
+    draw_line(n_next_open, n_S6, n_next_close, n_S6, xloc.bar_time, extend.none, color_S6, line.style_solid, 1) //Bear Target 2
+
+
+
+if show_chart and next_period and lower_cams //Lower order Canmarillas
+
+    draw_line(n_next_open, n_R1, n_next_close, n_R1, xloc.bar_time, extend.none, color_R1, line.style_solid, 1) //R1
+
+    draw_line(n_next_open, n_R2, n_next_close, n_R2, xloc.bar_time, extend.none, color_R2, line.style_solid, 1) //R2
+
+    draw_line(n_next_open, n_S1, n_next_close, n_S1, xloc.bar_time, extend.none, color_S1, line.style_solid, 1) //R1
+
+    draw_line(n_next_open, n_S2, n_next_close, n_S2, xloc.bar_time, extend.none, color_S2, line.style_solid, 1) //R2
+
+
+
+if show_chart and next_period and CPR //CPR
+
+    draw_box(n_next_open, n_BC, n_next_close, n_TC, color.new(color_CP,100), 1, line.style_solid, extend.none, xloc.bar_time, color_CP) //Central Pivot Range
+
+    draw_line(n_next_open, n_CP, n_next_close, n_CP, xloc.bar_time, extend.none, color.new(color_CP,transp_func()), line.style_solid, 2) //Central Pivot
+
+    draw_line(n_next_open, n_BC, n_next_close, n_BC, xloc.bar_time, extend.none, color.new(color_CP,transp_func()), line.style_solid, 1) //Bottom Channel
+
+    draw_line(n_next_open, n_TC, n_next_close, n_TC, xloc.bar_time, extend.none, color.new(color_CP,transp_func()), line.style_solid, 1) //Top Channel
+
+
+
+if show_chart and next_period and pp_hlc //PP High Low Close
+
+    draw_line(n_next_open, n_sclose, n_next_close, n_sclose, xloc.bar_time, extend.none, color_close, line.style_solid, 1) //PP Close
+
+    draw_line(n_next_open, n_shigh, n_next_close, n_shigh, xloc.bar_time, extend.none, color_high, line.style_solid, 1) //PP High
+
+    draw_line(n_next_open, n_slow, n_next_close, n_slow, xloc.bar_time, extend.none, color_low, line.style_solid, 1) //PP Low
+
+
+
+//***End of plotting***
+
+//*********************
+
+//----
+
+
+
+
+
+//*********************
+
+//***Start of Labels***
+
+
+
+label_R1 = ''
+
+label_R2 = ''
+
+label_R6 = ''
+
+label_R5 = ''
+
+label_R4 = ''
+
+label_R3 = ''
+
+label_R35 = ''
+
+label_S6 = ''
+
+label_S5 = ''
+
+label_S4 = ''
+
+label_S3 = ''
+
+label_S35 = ''
+
+label_S1 = ''
+
+label_S2 = ''
+
+label_TC = ''
+
+label_CP = ''
+
+label_BC = ''
+
+label_PPC = ''
+
+label_PPH = ''
+
+label_PPL = ''
+
+
+
+//Convert 3M/12M to Q/Y, 24H to D for labels
+
+label_t = t + ' '
+
+if t == t_q
+
+    label_t := 'Q '
+
+else if t == t_y
+
+    label_t := 'Y '
+
+else if t == t_d_lt
+
+    label_t := 'D '
+
+
+
+if labels_enabled == true and not next_period
+
+    label_R1 := str.tostring(math.round_to_mintick(R1))
+
+    label_R2 := str.tostring(math.round_to_mintick(R2))
+
+    label_R6 := str.tostring(math.round_to_mintick(R6))
+
+    label_R5 := str.tostring(math.round_to_mintick(R5))
+
+    label_R4 := str.tostring(math.round_to_mintick(R4))
+
+    label_R35 := str.tostring(math.round_to_mintick(R35))
+
+    label_R3 := str.tostring(math.round_to_mintick(R3))
+
+    label_S6 := str.tostring(math.round_to_mintick(S6))
+
+    label_S5 := str.tostring(math.round_to_mintick(S5))
+
+    label_S4 := str.tostring(math.round_to_mintick(S4))
+
+    label_S35 := str.tostring(math.round_to_mintick(S35))
+
+    label_S3 := str.tostring(math.round_to_mintick(S3))
+
+    label_S1 := str.tostring(math.round_to_mintick(S1))
+
+    label_S2 := str.tostring(math.round_to_mintick(S2))
+
+    label_TC := str.tostring(math.round_to_mintick(TC))
+
+    label_CP := str.tostring(math.round_to_mintick(CP))
+
+    label_BC := str.tostring(math.round_to_mintick(BC))
+
+    label_PPC := str.tostring(sclose)
+
+    label_PPH := str.tostring(shigh)
+
+    label_PPL := str.tostring(slow)
+
+else if labels_enabled == true and next_period
+
+    label_R1 := str.tostring(math.round_to_mintick(n_R1))
+
+    label_R2 := str.tostring(math.round_to_mintick(n_R2))
+
+    label_R6 := str.tostring(math.round_to_mintick(n_R6))
+
+    label_R5 := str.tostring(math.round_to_mintick(n_R5))
+
+    label_R4 := str.tostring(math.round_to_mintick(n_R4))
+
+    label_R35 := str.tostring(math.round_to_mintick(n_R35))
+
+    label_R3 := str.tostring(math.round_to_mintick(n_R3))
+
+    label_S6 := str.tostring(math.round_to_mintick(n_S6))
+
+    label_S5 := str.tostring(math.round_to_mintick(n_S5))
+
+    label_S4 := str.tostring(math.round_to_mintick(n_S4))
+
+    label_S35 := str.tostring(math.round_to_mintick(n_S35))
+
+    label_S3 := str.tostring(math.round_to_mintick(n_S3))
+
+    label_S1 := str.tostring(math.round_to_mintick(n_S1))
+
+    label_S2 := str.tostring(math.round_to_mintick(n_S2))
+
+    label_TC := str.tostring(math.round_to_mintick(n_TC))
+
+    label_CP := str.tostring(math.round_to_mintick(n_CP))
+
+    label_BC := str.tostring(math.round_to_mintick(n_BC))
+
+    label_PPC := str.tostring(n_sclose)
+
+    label_PPH := str.tostring(n_shigh)
+
+    label_PPL := str.tostring(n_slow)
+
+
+
+string_R2 = ' (' + label_R2 + ')'
+
+string_R1 = ' (' + label_R1 + ')'
+
+string_R6 = ' (' + label_R6 + ')'
+
+string_R5 = ' (' + label_R5 + ')'
+
+string_R4 = ' (' + label_R4 + ')'
+
+string_R3R35 = ' (' + label_R3 + ' - ' + label_R35 + ')'
+
+string_S6 = ' (' + label_S6 + ')'
+
+string_S5 = ' (' + label_S5 + ')'
+
+string_S4 = ' (' + label_S4 + ')'
+
+string_S3S35 = ' (' + label_S3 + ' - ' + label_S35 + ')'
+
+string_S1 = ' (' + label_S1 + ')'
+
+string_S2 = ' (' + label_S2 + ')'
+
+string_TC = ' (' + label_TC + ')'
+
+string_CP = ' (' + label_CP + ')'
+
+string_BC = ' (' + label_BC + ')'
+
+string_PPC = ' (' + label_PPC + ')'
+
+string_PPH = ' (' + label_PPH + ')'
+
+string_PPL = ' (' + label_PPL + ')'
+
+
+
+//This period labels
+
+if show_chart and labels_enabled == true and not next_period
+
+    draw_label(bar_index, R6, label_t + text_R6 + string_R6, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R6,transp_func()), size.normal, text.align_left, '') //Bull target 2
+
+    draw_label(bar_index, R5, label_t + text_R5 + string_R5, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R5,transp_func()), size.normal, text.align_left, '') //Bull Target 1
+
+    draw_label(bar_index, R4, label_t + text_R4 + string_R4, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R4,transp_func()), size.normal, text.align_left, '') //Bear Last Stand
+
+    draw_label(bar_index, R3 + (R35 - R3) / 2, label_t + text_R3R35 + string_R3R35, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R35,transp_func()), size.normal, text.align_left, '') //Bear Reversal Zone
+
+    draw_label(bar_index, S3 - (S3 - S35) / 2, label_t + text_S3S35 + string_S3S35, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S35,transp_func()), size.normal, text.align_left, '') //Bull Reversal Zone
+
+    draw_label(bar_index, S4, label_t + text_S4 + string_S4, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S4,transp_func()), size.normal, text.align_left, '') //Bull Last Stand
+
+    draw_label(bar_index, S5, label_t + text_S5 + string_S5, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S5,transp_func()), size.normal, text.align_left, '') //Bear Target 1
+
+    draw_label(bar_index, S6, label_t + text_S6 + string_S6, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S6,transp_func()), size.normal, text.align_left, '') //Bear Target 2
+
+
+
+if show_chart and labels_enabled == true and lower_cams and not next_period
+
+    draw_label(bar_index, S1, label_t + text_S1 + string_S1, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S1,transp_func()), size.normal, text.align_left, '') //S1
+
+    draw_label(bar_index, S2, label_t + text_S2 + string_S2, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S2,transp_func()), size.normal, text.align_left, '') //S2
+
+    draw_label(bar_index, R1, label_t + text_R1 + string_R1, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R1,transp_func()), size.normal, text.align_left, '') //R1
+
+    draw_label(bar_index, R2, label_t + text_R2 + string_R2, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R2,transp_func()), size.normal, text.align_left, '') //R2
+
+
+
+if show_chart and labels_enabled == true and CPR and not next_period
+
+    draw_label(bar_index, TC, label_t + text_TC + string_TC, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_CP,transp_func()), size.normal, text.align_left, '') //TC
+
+    draw_label(bar_index, BC, label_t + text_BC + string_BC, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_CP,transp_func()), size.normal, text.align_left, '') //BC
+
+    draw_label(bar_index, CP, label_t + text_CP + string_CP, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_CP,transp_func()), size.normal, text.align_left, '') //CP
+
+
+
+if show_chart and labels_enabled == true and pp_hlc and not next_period
+
+    draw_label(bar_index, sclose, label_t + text_PP_Close + string_PPC, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_close,transp_func()), size.normal, text.align_left, '') //PP Close
+
+    draw_label(bar_index, shigh, label_t + text_PP_High + string_PPH, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_high,transp_func()), size.normal, text.align_left, '') //PP High
+
+    draw_label(bar_index, slow, label_t + text_PP_Low + string_PPL, xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_low,transp_func()), size.normal, text.align_left, '') //PP Low
+
+
+
+//Next period labels
+
+if show_chart and labels_enabled == true and next_period
+
+    draw_label(n_next_close, n_R6, label_t + text_R6 + string_R6, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R6,transp_func()), size.normal, text.align_left, '') //Bull target 2
+
+    draw_label(n_next_close, n_R5, label_t + text_R5 + string_R5, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R5,transp_func()), size.normal, text.align_left, '') //Bull Target 1
+
+    draw_label(n_next_close, n_R4, label_t + text_R4 + string_R4, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R4,transp_func()), size.normal, text.align_left, '') //Bear Last Stand
+
+    draw_label(n_next_close, n_R3 + (n_R35 - n_R3) / 2, label_t + text_R3R35 + string_R3R35, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R35,transp_func()), size.normal, text.align_left, '') //Bear Reversal Zone
+
+    draw_label(n_next_close, n_S3 - (n_S3 - n_S35) / 2, label_t + text_S3S35 + string_S3S35, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S35,transp_func()), size.normal, text.align_left, '') //Bull Reversal Zone
+
+    draw_label(n_next_close, n_S4, label_t + text_S4 + string_S4, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S4,transp_func()), size.normal, text.align_left, '') //Bull Last Stand
+
+    draw_label(n_next_close, n_S5, label_t + text_S5 + string_S5, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S5,transp_func()), size.normal, text.align_left, '') //Bear Target 1
+
+    draw_label(n_next_close, n_S6, label_t + text_S6 + string_S6, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S6,transp_func()), size.normal, text.align_left, '') //Bear Target 2
+
+
+
+if show_chart and labels_enabled == true and lower_cams and next_period
+
+    draw_label(n_next_close, n_S1, label_t + text_S1 + string_S1, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S1,transp_func()), size.normal, text.align_left, '') //S1
+
+    draw_label(n_next_close, n_S2, label_t + text_S2 + string_S2, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_S2,transp_func()), size.normal, text.align_left, '') //S2
+
+    draw_label(n_next_close, n_R1, label_t + text_R1 + string_R1, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R1,transp_func()), size.normal, text.align_left, '') //R1
+
+    draw_label(n_next_close, n_R2, label_t + text_R2 + string_R2, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_R2,transp_func()), size.normal, text.align_left, '') //R2
+
+
+
+if show_chart and labels_enabled == true and CPR and next_period
+
+    draw_label(n_next_close, n_TC, label_t + text_TC + string_TC, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_CP,transp_func()), size.normal, text.align_left, '') //TC
+
+    draw_label(n_next_close, n_BC, label_t + text_BC + string_BC, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_CP,transp_func()), size.normal, text.align_left, '') //BC
+
+    draw_label(n_next_close, n_CP, label_t + text_CP + string_CP, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_CP,transp_func()), size.normal, text.align_left, '') //CP
+
+
+
+if show_chart and labels_enabled == true and pp_hlc and next_period
+
+    draw_label(n_next_close, n_sclose, label_t + text_PP_Close + string_PPC, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_close,transp_func()), size.normal, text.align_left, '') //PP Close
+
+    draw_label(n_next_close, n_shigh, label_t + text_PP_High + string_PPH, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_high,transp_func()), size.normal, text.align_left, '') //PP High
+
+    draw_label(n_next_close, n_slow, label_t + text_PP_Low + string_PPL, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, color.new(color_low,transp_func()), size.normal, text.align_left, '') //PP Low
